@@ -55,16 +55,17 @@ origin.df<-origin.coded%>%
   filter(!is.na(lon))%>%
   left_join(sauce)%>%
   mutate(country = str_trim(word(address, 3, sep=',')),
-         country = case_when(tolower(address) %in% c('china','india','thailand','brazil','nicaragua','malaysia','tunisia') ~ address,
-                             str_trim(word(tolower(address), 2)) %in% c('jamaica','china','rwanda','uganda','korea') ~str_trim(word(tolower(address), 2)),
+         country=case_when(ORIGIN == 'Johannesburg, South Africa' ~'south africa', TRUE ~ country),
+         country = case_when(tolower(address) %in% c('china','india','thailand','brazil','nicaragua','malaysia','tunisia','indonesia') ~ address,
+                             str_trim(word(tolower(address), 2)) %in% c('jamaica','china','rwanda','uganda','korea') ~str_trim(word(address), 2),
                              country == 'usa' ~ 'united states of america',
                              TRUE ~ country))%>%
   st_as_sf(coords=c('lon','lat'), crs=4326)
 origin.df
-origin.ct<-origin.df%>%
-  group_by(ORIGIN)%>%
-  summarize(n=length(NAME))
-origin.ct
+unique(origin.df$country)
+origin.df%>%filter(is.na(country))
+
+setdiff(unique(sauce$ORIGIN),origin.df$ORIGIN)
 
 ## countries
 sauce.cos<-world%>%
@@ -81,25 +82,31 @@ usa.alaska<-usa.parts%>%filter(part == 22)
 usa.48<-usa.parts%>%filter(part %in% c(8:20))
 usa.hawaii<-usa.parts%>%filter(part %in% c(1:7))
 sauce.countries<-rbind(usa.48%>%dplyr::select(-part), usa.hawaii%>%dplyr::select(-part), sauce.cos)
-glimpse(sauce.countries)
-unique(sauce.countries$admin)
+sauce.countries$admin # this is missin a bunch of countries
 
 ggplot(world)+
   geom_sf(data=usa.48, color=NA, fill='lightgreen', alpha=.3)
-unique(origin.df$ORIGIN)
+str(origin.df)
+
 ## map sauce origins wiht labels
 origin.map<-ggplot(world)+
   geom_sf(color=NA, fill='#70d2a9', alpha=.3)+
   geom_sf(data=sauce.countries, fill='slateblue', alpha=.4, color=NA)+
-  geom_point_interactive(data=origin.df, color='gold', shape=21, size=2.5, alpha=.9, aes(tooltip=paste(MAKER, NAME)))+
-  geom_sf(data=origin.df, color='orangered', shape=16, size=1.2, alpha=.9)+
+  geom_sf_interactive(data=origin.df, color='gold', shape=21, size=2.5, alpha=.7, aes(tooltip=paste0(MAKER,'\n', NAME)))+
+  geom_sf_interactive(data=origin.df, color='orangered', shape=16, size=1.2, alpha=.7, aes(tooltip=paste0(MAKER, '\n', NAME)))+
   theme_void(base_size=14)+
   theme(legend.position='none')+
   coord_sf(xlim=c(extent(origin.df)[1],extent(origin.df)[2]*1.2), 
            ylim=c(extent(origin.df)[3]*4,extent(origin.df)[4]*1.7), 
            expand=TRUE)
 
-ggplotly(origin.map)
+tooltip_css <- "background-color:gray;color:white;padding:5px;border-radius:5px;font-family:sans-serif"
+
+inter.origin<-girafe(ggob=origin.map, 
+       options = list(opts_tooltip(offx = 20, offy = 20, css = tooltip_css, opts_hover(css='fill:violet;'))))
+htmlwidgets::saveWidget(inter.origin, "originmap.html" )
+browseURL( "originmap.html" )
+
 
 library(mapview)
 library(leaflet)
@@ -124,4 +131,22 @@ ggplot(world)+
 
 
 # coord_sf(crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs ")+
-separador('#### map')
+separador('#### lollipop')
+
+#### lollipop ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+str(sauce)
+unique(sauce$CHILE)
+sauce%>%filter(is.na(CHILE))
+
+co.count<-sauce%>%
+  group_by(CHILE)%>%
+  summarize(n=length(unique(NAME)))
+
+
+
+
+
+
+
+
+
