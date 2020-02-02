@@ -69,24 +69,25 @@ setdiff(unique(sauce$ORIGIN),origin.df$ORIGIN)
 
 ## countries
 sauce.cos<-world%>%
-  filter(tolower(admin) %in% origin.df$country)%>%
-  filter(admin != 'United States of America')
+  filter(tolower(admin) %in% tolower(origin.df$country))
 unique(sauce.cos$admin)
 unique(origin.df$country) #12
 str(sauce.cos)
 
 ## remove alaska from selection, misleading
 usa.parts<-sauce.cos%>%filter(admin == 'United States of America')%>%st_cast(to='POLYGON', group_or_split=TRUE)
+
 usa.parts$part<-seq(1:length(usa.parts$admin))
+
 usa.alaska<-usa.parts%>%filter(part == 22)
 usa.48<-usa.parts%>%filter(part %in% c(8:20))
 usa.hawaii<-usa.parts%>%filter(part %in% c(1:7))
-sauce.countries<-rbind(usa.48%>%dplyr::select(-part), usa.hawaii%>%dplyr::select(-part), sauce.cos)
+
+sauce.countries<-rbind(usa.48%>%dplyr::select(-part), usa.hawaii%>%dplyr::select(-part), sauce.cos%>%filter(admin != 'United States of America'))
 sauce.countries$admin # this is missin a bunch of countries
 
-ggplot(world)+
-  geom_sf(data=usa.48, color=NA, fill='lightgreen', alpha=.3)
-str(origin.df)
+ggplot()+
+  geom_sf(data=usa.48)
 
 ## map sauce origins wiht labels
 origin.map<-ggplot(world)+
@@ -138,12 +139,24 @@ str(sauce)
 unique(sauce$CHILE)
 sauce%>%filter(is.na(CHILE))
 
-co.count<-sauce%>%
-  group_by(CHILE)%>%
-  summarize(n=length(unique(NAME)))
+chiles<-sauce%>%
+  separate(CHILE, into=c('a','b','c','d','e'), sep=',', remove=FALSE)%>%
+  melt(id.vars=colnames(sauce))%>%
+  mutate(value=tolower(str_trim(value)))%>%
+  group_by(value)%>%
+  summarize(n=length(unique(NAME)), heat_mean=mean(na.omit(HEAT)), heat_se=se(HEAT),
+            rating_mean=mean(STARS), rating_se=se(STARS))
+chiles
 
+ggplot(data=chiles%>%filter(!is.na(value)))+
+  geom_segment(aes(x=reorder(value, n),yend=n, y=0, xend=reorder(value, n)), size=1.5, color='orangered')+
+  geom_point(aes(reorder(value, n),n,fill=rating_mean),size=3.5, shape=21, stroke=1.8, color='orangered', fill='orangered')+
+  geom_text(aes(reorder(value, n),n, label=n),size=3.5, shape=21,color='white', fill='white')+
+  labs(x='',y='')+
+  coord_flip()+
+  theme(axis.text.x=element_blank(), axis.line.x=element_blank(), axis.ticks.x=element_blank())
 
-
+ggsave(paste0(path, 'chile_rank.pdf'), width=4, height=5)
 
 
 
