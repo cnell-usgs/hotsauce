@@ -16,8 +16,8 @@ path<-'/Users/collnell/Dropbox/rstats/hotsauce/'
 
 sauce<-read_excel(paste0(path,'ratings.xlsx'))
 
-# clean locations
-unique(sauce$ORIGIN)
+# clean peppers
+unique(sauce$CHILE)
 
 sauce
 
@@ -108,13 +108,15 @@ inter.origin<-girafe(ggob=origin.map,
 htmlwidgets::saveWidget(inter.origin, "originmap.html" )
 browseURL( "originmap.html" )
 
+origin.map
+ggsave(paste0(path, 'map_origin.pdf'), width=9, height=5)
 
 library(mapview)
 library(leaflet)
 library(ggiraph)
 
 
-ggsave(paste0(path, 'map_origin.pdf'), width=9, height=5)
+
 
 #   geom_sf_text(data=origin.df, aes(label=NAME), color='black')+
 #   geom_sf_text(data=origin.df%>%filter(ORIGIN =='Washington, D.C.'), aes(label=ORIGIN), color='black', label='current\nlocation')+
@@ -140,26 +142,76 @@ unique(sauce$CHILE)
 sauce%>%filter(is.na(CHILE))
 
 chiles<-sauce%>%
+  mutate(CHILE = tolower(CHILE))%>%
   separate(CHILE, into=c('a','b','c','d','e'), sep=',', remove=FALSE)%>%
-  melt(id.vars=colnames(sauce))%>%
-  mutate(value=tolower(str_trim(value)))%>%
-  group_by(value)%>%
+  melt(id.vars=colnames(sauce))%>%filter(!is.na(value))%>%
+  mutate(value=str_trim(gsub('pepper', '', gsub('chile','',gsub('chili','', tolower(value))))),
+         chile = case_when(
+           value == 'malagueta s' ~ 'malagueta', 
+           value == 'trinidad scorpion 7 pot' ~ 'trinidad 7 pot', 
+           TRUE ~ value))%>%
+  group_by(chile)%>%
   summarize(n=length(unique(NAME)), heat_mean=mean(na.omit(HEAT)), heat_se=se(HEAT),
-            rating_mean=mean(STARS), rating_se=se(STARS))
+            rating_mean=mean(STARS), rating_se=se(STARS))%>%
+  mutate(n=ifelse(chile == 'scorpion', 5, n))%>%
+  arrange(desc(n))
 chiles
 
-ggplot(data=chiles%>%filter(!is.na(value)))+
-  geom_segment(aes(x=reorder(value, n),yend=n, y=0, xend=reorder(value, n)), size=1.5, color='orangered')+
-  geom_point(aes(reorder(value, n),n,fill=rating_mean),size=3.5, shape=21, stroke=1.8, color='orangered', fill='orangered')+
-  geom_text(aes(reorder(value, n),n, label=n),size=3.5, shape=21,color='white', fill='white')+
+
+ggplot(data=chiles%>%filter(!is.na(chile)))+
+  geom_segment(aes(x=reorder(chile, n),yend=n, y=0, xend=reorder(chile, n)), size=1.5, color='orangered')+
+  geom_point(aes(reorder(chile, n),n,fill=rating_mean),size=3.5, shape=21, stroke=1.8, color='orangered', fill='orangered')+
+  geom_text(aes(reorder(chile, n),n, label=n),size=3.5,color='white')+
   labs(x='',y='')+
   coord_flip()+
   theme(axis.text.x=element_blank(), axis.line.x=element_blank(), axis.ticks.x=element_blank())
 
 ggsave(paste0(path, 'chile_rank.pdf'), width=4, height=5)
 
+### top sauce
+sauce%>%
+  arrange(desc(HEAT))
+sauce%>%filter(STARS==5)
+sauce%>%
+  group_by()
+
+sauce%>%
+  ggplot()+
+  geom_point(aes(x=tolower(CHILE), y=HEAT))+
+  coord_flip()
+
+## best of pepper types
+
+## which sauce is the hottest?
+# flover profile of top 3
+str(sauce)
+sauce%>%
+  dplyr::select(-SCOVILLE:-RICE, -CHOCOLATE)%>%
+  filter(STARS==5)%>%
+  melt(id.vars=c('ORIGIN','NAME','MAKER','STARS','HEAT','CHILE','BASE'))%>%
+  filter(!(variable %in% c('DARK FRUIT')))%>%
+  arrange(desc(STARS))%>%
+  ggplot()+
+  geom_bar(stat='identity',aes(x=variable, y=value, fill=variable), color=NA)+
+  coord_polar()+theme(axis.text=element_blank())+
+  facet_wrap(~NAME, ncol=8)+theme_void()+
+  theme(panel.grid.major.y=element_line(color='white'), panel.ontop=TRUE, legend.position='bottom')
+
+ggsave(paste0(path, 'flavor_polar_pie_top.pdf'), width=10, height=10)
+
+## profile for hottest, most  unique
 
 
 
+## which sauce was hottest?
+
+sauce%>%
+  ggplot()+
+  geom_segment(aes(x=reorder(NAME, HEAT),yend=HEAT, y=0, xend=reorder(NAME, HEAT)), size=1.5, color='orangered')+
+  geom_point(aes(reorder(NAME, HEAT),HEAT),size=3.5, shape=21, stroke=1.8, color='orangered', fill='orangered')+
+  geom_text(aes(reorder(NAME, HEAT), HEAT, label=HEAT),size=3,color='white')+
+  labs(x='',y='')+
+  coord_flip()+
+  theme(axis.text.x=element_blank(), axis.line.x=element_blank(), axis.ticks.x=element_blank())
 
 
